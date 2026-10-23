@@ -1,0 +1,51 @@
+name: Construire l'APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trouver main.dart
+        run: |
+          if [ -f lib/main.dart ]; then SRC=lib/main.dart
+          else SRC=$(find . -path ./.git -prune -o -type f -iname '*main.dart*' -print | head -n 1); fi
+          if [ -z "$SRC" ]; then echo "main.dart introuvable"; exit 1; fi
+          echo "Fichier utilisé : $SRC"
+          cp "$SRC" /tmp/main.dart
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Générer le projet Android
+        run: |
+          flutter create --org com.nigbou --project-name scanpieces --platforms android app
+          cp pubspec.yaml app/pubspec.yaml
+          rm -rf app/lib app/test
+          mkdir -p app/lib
+          cp /tmp/main.dart app/lib/main.dart
+          sed -i 's/android:label="scanpieces"/android:label="ScanPièces"/' app/android/app/src/main/AndroidManifest.xml
+
+      - name: Installer les dépendances
+        working-directory: app
+        run: flutter pub get
+
+      - name: Compiler l'APK
+        working-directory: app
+        run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ScanPieces-APK
+          path: app/build/app/outputs/flutter-apk/app-release.apk
