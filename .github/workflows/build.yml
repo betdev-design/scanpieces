@@ -35,6 +35,9 @@ jobs:
           rm -rf app/lib app/test
           mkdir -p app/lib
           cp /tmp/main.dart app/lib/main.dart
+                    F=app/android/app/build.gradle.kts
+          sed -i 's/signingConfig = signingConfigs.getByName("debug")/signingConfig = signingConfigs.getByName("debug")\n            isMinifyEnabled = false\n            isShrinkResources = false/' "$F"
+          grep -n "Minify" "$F"
           sed -i 's/android:label="scanpieces"/android:label="ScanPièces"/' app/android/app/src/main/AndroidManifest.xml
 
       - name: Installer les dépendances
