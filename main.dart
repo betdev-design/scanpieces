@@ -30,6 +30,11 @@ Uint8List rasterEnJpg((int, int, Uint8List) d) {
   return Uint8List.fromList(img.encodeJpg(fond, quality: 90));
 }
 
+/// Lance la conversion en arrière-plan. Fonction de premier niveau : la
+/// tâche n'emporte que w, h et px, pas l'écran de l'appli.
+Future<Uint8List> rasterEnJpgAsync(int w, int h, Uint8List px) =>
+    Isolate.run(() => rasterEnJpg((w, h, px)));
+
 const Color kEncre = Color(0xFF3438A8);
 
 class ScanPiecesApp extends StatelessWidget {
@@ -1131,8 +1136,8 @@ class _ScanScreenState extends State<ScanScreen> {
         final fichiers = <XFile>[];
         var n = 1;
         await for (final page in Printing.raster(bytes, dpi: 200)) {
-          final jpg = await compute(
-              rasterEnJpg, (page.width, page.height, page.pixels));
+          final jpg =
+              await rasterEnJpgAsync(page.width, page.height, page.pixels);
           final suffixe = pages.length > 1 ? '_p$n' : '';
           final f = File('${dir.path}/$nomFichier$suffixe.jpg');
           await f.writeAsBytes(jpg);
