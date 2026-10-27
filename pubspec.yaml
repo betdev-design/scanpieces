@@ -1,7 +1,7 @@
 name: scanpieces
 description: "ScanPièces - scanner de cartes, permis, passeports et documents."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.2.0+3
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -15,6 +15,7 @@ dependencies:
   printing: ^5.13.4
   share_plus: ^11.0.0
   path_provider: ^2.1.4
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_lints: ^5.0.0

@@ -11,6 +11,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const ScanPiecesApp());
 
@@ -185,9 +186,10 @@ Future<Uint8List> construirePdf(List<PageA4> pages, String titre) async {
     doc.addPage(pw.Page(
       pageFormat: fmt,
       margin: pw.EdgeInsets.zero,
-      build: (_) => pw.SizedBox(
+      build: (_) => pw.Container(
           width: fmt.width,
           height: fmt.height,
+          color: PdfColors.white,
           child: pw.Stack(children: enfants)),
     ));
   }
@@ -198,16 +200,72 @@ Future<Uint8List> construirePdf(List<PageA4> pages, String titre) async {
 
 void quitterAppli() => SystemNavigator.pop();
 
-void aPropos(BuildContext context) => showAboutDialog(
-      context: context,
-      applicationName: 'ScanPièces',
-      applicationVersion: '1.1',
-      applicationIcon: const Icon(Icons.document_scanner, size: 40),
-      children: const [
-        Text('Scanner de cartes, permis, passeports et documents.\n'
-            'Recto et verso côte à côte, passeport superposé, export PDF.'),
+const kLienPlayStore =
+    'https://play.google.com/store/apps/details?id=com.nigbou.scanpieces';
+const kWhatsApp = 'https://wa.me/22671349749';
+const kTelegram = 'https://t.me/Leuk18';
+const kFacebook = 'https://www.facebook.com/nigbouaischool';
+
+Future<void> ouvrirLien(String url) async {
+  try {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  } catch (_) {}
+}
+
+void partagerAppli() => SharePlus.instance.share(ShareParams(
+    text: 'ScanPièces : scanne ta CNIB, ton permis ou ton passeport, '
+        'recto et verso sur une seule page, en PDF prêt à envoyer. '
+        'Gratuit et sans filigrane.\n$kLienPlayStore'));
+
+void aPropos(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
+  Widget lien(IconData ic, String t, String url) => ListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(ic, color: cs.primary),
+        title: Text(t),
+        onTap: () => ouvrirLien(url),
+      );
+  showDialog(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('ScanPièces'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version 1.2 · une appli NIGBOU AI',
+                style: TextStyle(color: cs.onSurfaceVariant)),
+            const SizedBox(height: 12),
+            const Text('Scanner de cartes, permis, passeports et documents. '
+                'Recto et verso côte à côte, passeport superposé, export PDF. '
+                'Vos documents restent sur votre téléphone.'),
+            const SizedBox(height: 16),
+            const Text('Apprenez à créer des applis comme celle-ci',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text('NIGBOU AI SCHOOL : formations IA, développement web '
+                'et analyse sportive. « Transforme l\'IA en revenus ».'),
+            const SizedBox(height: 6),
+            lien(Icons.facebook, 'NIGBOU AI SCHOOL sur Facebook', kFacebook),
+            lien(Icons.chat_outlined, 'WhatsApp : +226 71 34 97 49', kWhatsApp),
+            lien(Icons.send_outlined, 'Telegram : t.me/Leuk18', kTelegram),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => showLicensePage(
+                context: c,
+                applicationName: 'ScanPièces',
+                applicationVersion: '1.2'),
+            child: const Text('Licences')),
+        FilledButton(
+            onPressed: () => Navigator.pop(c), child: const Text('Fermer')),
       ],
-    );
+    ),
+  );
+}
 
 class MenuLateral extends StatelessWidget {
   final Mode? actuel;
@@ -272,9 +330,28 @@ class MenuLateral extends StatelessWidget {
               Navigator.pop(context);
               aPropos(context);
             }),
+            item(Icons.share_outlined, 'Partager l\'appli', () {
+              Navigator.pop(context);
+              partagerAppli();
+            }),
             const Spacer(),
             item(Icons.logout, 'Quitter l\'application', quitterAppli),
-            const SizedBox(height: 8),
+            const Divider(height: 1),
+            InkWell(
+              onTap: () {
+                Navigator.pop(context);
+                aPropos(context);
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: Text('Une appli NIGBOU AI',
+                    style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.4)),
+              ),
+            ),
           ],
         ),
       ),
@@ -337,6 +414,23 @@ class HomeScreen extends StatelessWidget {
             'Le scanner détecte les bords automatiquement et redresse la photo. '
             'Vous pouvez aussi importer depuis la galerie.',
             style: TextStyle(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: partagerAppli,
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Partager ScanPièces avec un ami'),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: TextButton(
+              onPressed: () => aPropos(context),
+              child: Text('Une appli NIGBOU AI',
+                  style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4)),
+            ),
           ),
         ],
       ),
@@ -477,10 +571,19 @@ class _ScanScreenState extends State<ScanScreen> {
         final fichiers = <XFile>[];
         var n = 1;
         await for (final page in Printing.raster(bytes, dpi: 200)) {
-          final png = await page.toPng();
+          final w = page.width, h = page.height, px = page.pixels;
+          // Fond blanc garanti + JPG (léger, bien affiché sur WhatsApp)
+          final jpg = await Isolate.run(() {
+            final src = img.Image.fromBytes(
+                width: w, height: h, bytes: px.buffer, numChannels: 4);
+            final fond = img.Image(width: w, height: h);
+            img.fill(fond, color: img.ColorRgb8(255, 255, 255));
+            img.compositeImage(fond, src);
+            return Uint8List.fromList(img.encodeJpg(fond, quality: 90));
+          });
           final suffixe = pages.length > 1 ? '_p$n' : '';
-          final f = File('${dir.path}/$nomFichier$suffixe.png');
-          await f.writeAsBytes(png);
+          final f = File('${dir.path}/$nomFichier$suffixe.jpg');
+          await f.writeAsBytes(jpg);
           fichiers.add(XFile(f.path));
           n++;
         }
