@@ -1498,36 +1498,43 @@ class _ScanScreenState extends State<ScanScreen> {
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
           child: Row(children: [
             Expanded(
-              flex: 3,
-              child: FilledButton.icon(
-                onPressed: pret && !occupe ? partagerPdf : null,
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('PDF'),
-              ),
-            ),
+                child: boutonBas(Icons.picture_as_pdf_outlined, 'PDF',
+                    pret && !occupe ? partagerPdf : null,
+                    plein: true)),
             const SizedBox(width: 8),
             Expanded(
-              flex: 3,
-              child: OutlinedButton.icon(
-                onPressed: pret && !occupe ? partagerImages : null,
-                icon: const Icon(Icons.image_outlined),
-                label: const Text('Image'),
-              ),
-            ),
+                child: boutonBas(Icons.image_outlined, 'Image',
+                    pret && !occupe ? partagerImages : null)),
             const SizedBox(width: 8),
             Expanded(
-              flex: 3,
-              child: OutlinedButton.icon(
-                onPressed: pret && !occupe ? autresFormats : null,
-                icon: const Icon(Icons.more_horiz),
-                label: const Text('Plus'),
-              ),
-            ),
+                child: boutonBas(Icons.more_horiz, 'Plus',
+                    pret && !occupe ? autresFormats : null)),
           ]),
         ),
       ),
       ),
     );
+  }
+
+  /// Bouton du bas : le texte reste toujours sur une seule ligne et se
+  /// réduit tout seul si la police du téléphone est grande.
+  Widget boutonBas(IconData ic, String texte, VoidCallback? action,
+      {bool plein = false}) {
+    final contenu = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(ic, size: 20),
+        const SizedBox(width: 6),
+        Text(texte, maxLines: 1, softWrap: false),
+      ]),
+    );
+    final style = ButtonStyle(
+      padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 8, vertical: 12)),
+    );
+    return plein
+        ? FilledButton(onPressed: action, style: style, child: contenu)
+        : OutlinedButton(onPressed: action, style: style, child: contenu);
   }
 
   Future<bool> confirmer(String titre, String texte) async {
