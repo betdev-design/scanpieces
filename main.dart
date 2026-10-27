@@ -18,6 +18,18 @@ import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const ScanPiecesApp());
 
+/// Convertit une page rendue en JPG sur fond blanc (fonction autonome,
+/// exécutable en arrière-plan sans emporter l'écran de l'appli).
+Uint8List rasterEnJpg((int, int, Uint8List) d) {
+  final (w, h, px) = d;
+  final src = img.Image.fromBytes(
+      width: w, height: h, bytes: px.buffer, numChannels: 4);
+  final fond = img.Image(width: w, height: h);
+  img.fill(fond, color: img.ColorRgb8(255, 255, 255));
+  img.compositeImage(fond, src);
+  return Uint8List.fromList(img.encodeJpg(fond, quality: 90));
+}
+
 const Color kEncre = Color(0xFF3438A8);
 
 class ScanPiecesApp extends StatelessWidget {
@@ -1119,16 +1131,8 @@ class _ScanScreenState extends State<ScanScreen> {
         final fichiers = <XFile>[];
         var n = 1;
         await for (final page in Printing.raster(bytes, dpi: 200)) {
-          final w = page.width, h = page.height, px = page.pixels;
-          // Fond blanc garanti + JPG (léger, bien affiché sur WhatsApp)
-          final jpg = await Isolate.run(() {
-            final src = img.Image.fromBytes(
-                width: w, height: h, bytes: px.buffer, numChannels: 4);
-            final fond = img.Image(width: w, height: h);
-            img.fill(fond, color: img.ColorRgb8(255, 255, 255));
-            img.compositeImage(fond, src);
-            return Uint8List.fromList(img.encodeJpg(fond, quality: 90));
-          });
+          final jpg = await compute(
+              rasterEnJpg, (page.width, page.height, page.pixels));
           final suffixe = pages.length > 1 ? '_p$n' : '';
           final f = File('${dir.path}/$nomFichier$suffixe.jpg');
           await f.writeAsBytes(jpg);
@@ -1507,7 +1511,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: OutlinedButton.icon(
                 onPressed: pret && !occupe ? autresFormats : null,
                 icon: const Icon(Icons.more_horiz),
