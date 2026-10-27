@@ -7,10 +7,12 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      KS_PASSWORD: ${{ secrets.KS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Trouver main.dart et le logo
+      - name: Trouver main.dart, le logo et la clé
         run: |
           if [ -f main.dart ]; then SRC=main.dart
           elif [ -f lib/main.dart ]; then SRC=lib/main.dart
@@ -25,6 +27,8 @@ jobs:
           else
             echo "Aucun logo : icône par défaut"
           fi
+          KS=$(find . -path ./.git -prune -o -type f -iname '*keystore*' -print | head -n 1)
+          if [ -n "$KS" ]; then echo "Clé trouvée : $KS"; cp "$KS" /tmp/upload.p12; else echo "Aucune clé"; fi
 
       - uses: actions/setup-java@v4
         with:
@@ -44,9 +48,28 @@ jobs:
           mkdir -p app/lib
           cp /tmp/main.dart app/lib/main.dart
           sed -i 's/android:label="scanpieces"/android:label="ScanPièces"/' app/android/app/src/main/AndroidManifest.xml
-          F=app/android/app/build.gradle.kts
-          sed -i 's/signingConfig = signingConfigs.getByName("debug")/signingConfig = signingConfigs.getByName("debug")\n            isMinifyEnabled = false\n            isShrinkResources = false/' "$F"
-          grep -n "Minify" "$F"
+          python3 - <<'PY'
+          import os
+          p = 'app/android/app/build.gradle.kts'
+          s = open(p).read()
+          old = 'signingConfig = signingConfigs.getByName("debug")'
+          if old not in s:
+              raise SystemExit('Ligne de signature introuvable dans build.gradle.kts')
+          if os.environ.get('KS_PASSWORD') and os.path.exists('/tmp/upload.p12'):
+              new = '''signingConfig = signingConfigs.create("upload") {
+                          storeFile = file("/tmp/upload.p12")
+                          storeType = "pkcs12"
+                          storePassword = System.getenv("KS_PASSWORD")
+                          keyAlias = "upload"
+                          keyPassword = System.getenv("KS_PASSWORD")
+                      }'''
+              print('Signature : clé ScanPièces (publiable sur le Play Store)')
+          else:
+              new = old
+              print('Signature : clé de test (AAB non publiable)')
+          new += '\n            isMinifyEnabled = false\n            isShrinkResources = false'
+          open(p, 'w').write(s.replace(old, new))
+          PY
 
       - name: Installer les dépendances
         working-directory: app
@@ -65,8 +88,16 @@ jobs:
         working-directory: app
         run: flutter build apk --release
 
+      - name: Compiler l'AAB (Play Store)
+        working-directory: app
+        run: flutter build appbundle --release
+
       - uses: actions/upload-artifact@v4
         with:
           name: ScanPieces-APK
           path: app/build/app/outputs/flutter-apk/app-release.apk
-          
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ScanPieces-PlayStore-AAB
+          path: app/build/app/outputs/bundle/release/app-release.aab
